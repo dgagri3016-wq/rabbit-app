@@ -1,0 +1,6 @@
+%%writefile requirements.txt
+streamlit
+tensorflow-cpu
+Pillow
+numpy
+requests
