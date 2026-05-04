@@ -15,6 +15,13 @@ IMG_SIZE = (299, 299)
 # --- Caching to prevent reloading on every click ---
 @st.cache_resource
 def load_model():
+    # PASTE YOUR COPIED GITHUB RELEASE LINK HERE:
+    MODEL_URL = "https://github.com/Rahman-Lone/rabbit-app/releases/download/v1.0/rabbit_breed_final_model.keras"
+    
+    # If the model isn't already downloaded, download it from the release
+    if not os.path.exists(MODEL_PATH):
+        st.info("Downloading AI Model for the first time. This might take a minute...")
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
     return tf.keras.models.load_model(MODEL_PATH)
 
 @st.cache_data
