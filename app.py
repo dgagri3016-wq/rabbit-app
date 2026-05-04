@@ -5,6 +5,7 @@ from PIL import Image
 import os
 import requests
 from io import BytesIO
+import urllib.request
 
 # --- Constants ---
 MODEL_PATH = "rabbit_breed_final_model.keras"
