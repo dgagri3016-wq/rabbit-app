@@ -8,7 +8,7 @@ from io import BytesIO
 import urllib.request
 
 # --- Constants ---
-MODEL_PATH = "rabbit_breed_final_model.keras"
+MODEL_PATH = "rabbit_breed_final_model.1.keras"
 LABELS_PATH = "tlabels.txt"
 IMG_SIZE = (299, 299)
 
