@@ -8,7 +8,7 @@ from io import BytesIO
 import urllib.request
 
 # --- Constants ---
-MODEL_PATH = "rabbit_breed_final_model(1).keras"
+MODEL_PATH = "rabbit_breed_final_model.keras"
 LABELS_PATH = "tlabels.txt"
 IMG_SIZE = (299, 299)
 
@@ -16,7 +16,7 @@ IMG_SIZE = (299, 299)
 @st.cache_resource
 def load_model():
     # PASTE YOUR COPIED GITHUB RELEASE LINK HERE:
-    MODEL_URL = "https://github.com/Rahman-Lone/rabbit-app/releases/download/v1.1/rabbit_breed_final_model.1.keras"
+    MODEL_URL = "https://github.com/Rahman-Lone/rabbit-app/releases/download/v1.1/rabbit_breed_final_model.keras"
   
     # If the model isn't already downloaded, download it from the release
     if not os.path.exists(MODEL_PATH):
