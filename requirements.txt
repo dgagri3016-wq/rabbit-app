@@ -3,3 +3,4 @@ tensorflow-cpu
 Pillow
 numpy
 requests
+scikit-learn
