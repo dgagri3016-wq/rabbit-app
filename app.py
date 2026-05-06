@@ -76,8 +76,8 @@ def load_labels():
 def preprocess_image_for_breed(image):
     image = image.convert("RGB")
     image = image.resize(BREED_IMG_SIZE)
-    img_array = np.array(image, dtype="float32")
-    img_array = img_array / 255.0 # Standard normalization (adjust if you used MobileNet etc.)
+    img_array = np.array(image)
+    img_array = np.array(image)
     return np.expand_dims(img_array, axis=0)
 
 def preprocess_image_for_weight(image):
