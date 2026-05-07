@@ -37,7 +37,7 @@ def load_breed_model():
         os.remove(BREED_MODEL_PATH)
             
     if not os.path.exists(BREED_MODEL_PATH):
-        st.toast("Downloading Breed Model (once)...", icon="⏳") # Toast is less intrusive on mobile
+        print("Downloading Breed Model (once)...") 
         urllib.request.urlretrieve(BREED_MODEL_URL, BREED_MODEL_PATH)
         
     return tf.keras.models.load_model(BREED_MODEL_PATH)
@@ -48,7 +48,7 @@ def load_weight_model():
         os.remove(WEIGHT_MODEL_PATH)
             
     if not os.path.exists(WEIGHT_MODEL_PATH):
-        st.toast("Downloading Weight Model (once)...", icon="⏳")
+        print("Downloading Weight Model (once)...")
         urllib.request.urlretrieve(WEIGHT_MODEL_URL, WEIGHT_MODEL_PATH)
         
     return tf.keras.models.load_model(WEIGHT_MODEL_PATH)
