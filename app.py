@@ -5,6 +5,8 @@ from PIL import Image
 import os
 import urllib.request
 import pickle
+import requests
+import io
 
 # ==========================================
 # 1. SETUP & CONSTANTS
@@ -94,7 +96,7 @@ if not class_labels:
 # MOBILE TWEAK: Use a selectbox instead of radio buttons to save vertical screen space
 option = st.selectbox(
     "📸 Choose image source:", 
-    ("Upload Image", "Camera Capture", "ESP32-CAM URL (Coming Soon)")
+    ("Upload Image", "Camera Capture", "ESP32-CAM via Ngrok")
 )
 
 image_to_process = None
@@ -109,8 +111,27 @@ elif option == "Camera Capture":
     if camera_file is not None:
         image_to_process = Image.open(camera_file)
 
-elif option == "ESP32-CAM URL (Coming Soon)":
-    st.info("ESP32-CAM stream configuration coming soon!")
+elif option == "ESP32-CAM via Ngrok":
+    st.info("Ensure your ESP32 is running and Ngrok is forwarding the tunnel.")
+    ngrok_url = st.text_input("https://pureblood-kinfolk-cod.ngrok-free.dev ", placeholder="https://1234-abcd.ngrok-free.app")
+    
+    if st.button("📸 Capture from ESP32", use_container_width=True):
+        if ngrok_url:
+            capture_url = f"{ngrok_url.rstrip('/')}/capture"
+            try:
+                with st.spinner("Snapping photo from ESP32..."):
+                    # Give it 15 seconds to connect and download the image
+                    response = requests.get(capture_url, timeout=15)
+                    
+                if response.status_code == 200:
+                    image_to_process = Image.open(io.BytesIO(response.content))
+                    st.success("Photo captured!")
+                else:
+                    st.error("Failed to capture image. Is the camera streaming?")
+            except Exception as e:
+                st.error(f"Error connecting to camera: {e}")
+        else:
+            st.warning("Please paste your Ngrok URL first!")
 
 # ==========================================
 # 5. PREDICTION & RESULTS DISPLAY
