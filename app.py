@@ -121,7 +121,7 @@ elif option == "ESP32-CAM via Ngrok":
             try:
                 with st.spinner("Snapping photo from ESP32..."):
                     # Give it 15 seconds to connect and download the image
-                    response = requests.get(capture_url, timeout=15)
+                    response = requests.get(capture_url, timeout=30)
                     
                 if response.status_code == 200:
                     image_to_process = Image.open(io.BytesIO(response.content))
