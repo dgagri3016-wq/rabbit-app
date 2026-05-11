@@ -113,7 +113,7 @@ elif option == "Camera Capture":
 
 elif option == "ESP32-CAM via Ngrok":
     st.info("Ensure your ESP32 is running and Ngrok is forwarding the tunnel.")
-    ngrok_url = st.text_input("https://pureblood-kinfolk-cod.ngrok-free.dev ", placeholder="https://1234-abcd.ngrok-free.app")
+    ngrok_url = st.text_input("https://pureblood-kinfolk-cod.ngrok-free.dev", placeholder="https://1234-abcd.ngrok-free.app")
     
     if st.button("📸 Capture from ESP32", use_container_width=True):
         if ngrok_url:
