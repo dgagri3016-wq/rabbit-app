@@ -117,7 +117,7 @@ elif option == "ESP32-CAM via Ngrok":
     
     if st.button("📸 Capture from ESP32", use_container_width=True):
         if ngrok_url:
-            capture_url = f"{ngrok_url.rstrip('/')}/capture"
+            capture_url = f"{ngrok_url.strip().rstrip('/')}/capture"
             try:
                 with st.spinner("Snapping photo from ESP32..."):
                     # Give it 15 seconds to connect and download the image
