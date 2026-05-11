@@ -113,21 +113,23 @@ elif option == "Camera Capture":
 
 elif option == "ESP32-CAM via Ngrok":
     st.info("Ensure your ESP32 is running and Ngrok is forwarding the tunnel.")
-    ngrok_url = st.text_input("https://pureblood-kinfolk-cod.ngrok-free.dev", placeholder="https://1234-abcd.ngrok-free.app")
+    ngrok_url = st.text_input("🔗 Paste your Ngrok URL here:", placeholder="https://1234-abcd.ngrok-free.app")
     
     if st.button("📸 Capture from ESP32", use_container_width=True):
         if ngrok_url:
             capture_url = f"{ngrok_url.strip().rstrip('/')}/capture"
             try:
                 with st.spinner("Snapping photo from ESP32..."):
+                    headers = {"ngrok-skip-browser-warning": "true"}
                     # Give it 15 seconds to connect and download the image
-                    response = requests.get(capture_url, timeout=30)
+                    response = requests.get(capture_url, timeout=45)
                     
                 if response.status_code == 200:
                     image_to_process = Image.open(io.BytesIO(response.content))
                     st.success("Photo captured!")
                 else:
-                    st.error("Failed to capture image. Is the camera streaming?")
+                    st.error(f"Failed to capture! Status Code: {response.status_code}")
+                    st.write(response.text[:200])
             except Exception as e:
                 st.error(f"Error connecting to camera: {e}")
         else:
