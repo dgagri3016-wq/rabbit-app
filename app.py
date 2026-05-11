@@ -93,39 +93,41 @@ if not class_labels:
     st.error(f"Missing {LABELS_PATH}.")
     st.stop()
 
-# MOBILE TWEAK: Use a selectbox instead of radio buttons to save vertical screen space
+# ---> NEW: Initialize Streamlit Memory <---
+# This tells Streamlit to "remember" our image between button clicks
+if "saved_image" not in st.session_state:
+    st.session_state.saved_image = None
+
 option = st.selectbox(
     "📸 Choose image source:", 
     ("Upload Image", "Camera Capture", "ESP32-CAM via Ngrok")
 )
 
-image_to_process = None
-
 if option == "Upload Image":
     uploaded_file = st.file_uploader("Select a photo", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
     if uploaded_file is not None:
-        image_to_process = Image.open(uploaded_file)
+        st.session_state.saved_image = Image.open(uploaded_file)
 
 elif option == "Camera Capture":
     camera_file = st.camera_input("Take a picture")
     if camera_file is not None:
-        image_to_process = Image.open(camera_file)
+        st.session_state.saved_image = Image.open(camera_file)
 
 elif option == "ESP32-CAM via Ngrok":
     st.info("Ensure your ESP32 is running and Ngrok is forwarding the tunnel.")
     ngrok_url = st.text_input("🔗 Paste your Ngrok URL here:", placeholder="https://1234-abcd.ngrok-free.app")
     
-    if st.button("📸 Capture from ESP32", use_container_width=True):
+    if st.button("📸 Capture from ESP32"):
         if ngrok_url:
             capture_url = f"{ngrok_url.strip().rstrip('/')}/capture"
             try:
                 with st.spinner("Snapping photo from ESP32..."):
                     headers = {"ngrok-skip-browser-warning": "true"}
-                    # Give it 15 seconds to connect and download the image
-                    response = requests.get(capture_url, timeout=45)
+                    response = requests.get(capture_url, headers=headers, timeout=45)
                     
                 if response.status_code == 200:
-                    image_to_process = Image.open(io.BytesIO(response.content))
+                    # Save the new image into Streamlit's memory!
+                    st.session_state.saved_image = Image.open(io.BytesIO(response.content))
                     st.success("Photo captured!")
                 else:
                     st.error(f"Failed to capture! Status Code: {response.status_code}")
@@ -139,26 +141,27 @@ elif option == "ESP32-CAM via Ngrok":
 # 5. PREDICTION & RESULTS DISPLAY
 # ==========================================
 
-if image_to_process is not None:
-    # use_container_width=True ensures the image scales down perfectly on mobile screens
-    st.image(image_to_process, use_container_width=True)
+# Check the memory instead of the temporary variable
+if st.session_state.saved_image is not None:
     
-    # MOBILE TWEAK: Make the button full width so it's easy to tap with a thumb
-    if st.button("🔮 Predict Breed & Weight", use_container_width=True):
+    # FIXED: Replaced use_container_width with width='stretch' per your log warnings!
+    st.image(st.session_state.saved_image, width="stretch")
+    
+    if st.button("🔮 Predict Breed & Weight", type="primary"):
         with st.spinner("Analyzing..."):
             
             # --- BREED PREDICTION ---
             breed_model = load_breed_model()
-            breed_processed = preprocess_image_for_breed(image_to_process)
+            # Pass the remembered image to your AI
+            breed_processed = preprocess_image_for_breed(st.session_state.saved_image)
             breed_predictions = breed_model.predict(breed_processed)
             
             predicted_index = np.argmax(breed_predictions[0])
             confidence = breed_predictions[0][predicted_index]
             predicted_label = class_labels[predicted_index]
             
-            st.divider() # Visual break
+            st.divider() 
             
-            # MOBILE TWEAK: Use st.metric for large, readable numbers on small screens
             col1, col2 = st.columns(2)
             col1.metric("Primary Breed", predicted_label)
             col2.metric("Confidence", f"{confidence * 100:.1f}%")
@@ -168,7 +171,7 @@ if image_to_process is not None:
                 weight_model = load_weight_model()
                 scaler = load_scaler()
                 
-                weight_processed = preprocess_image_for_weight(image_to_process)
+                weight_processed = preprocess_image_for_weight(st.session_state.saved_image)
                 scaled_weight_pred = weight_model.predict(weight_processed)
                 real_weight = scaler.inverse_transform(scaled_weight_pred)
                 
@@ -180,6 +183,5 @@ if image_to_process is not None:
             with st.expander("📊 View Top 3 Breed Probabilities"):
                 top_indices = np.argsort(breed_predictions[0])[-3:][::-1]
                 for i in top_indices:
-                    # Uses a progress bar for a nice visual representation of confidence
                     st.write(f"**{class_labels[i]}**")
                     st.progress(float(breed_predictions[0][i]))
