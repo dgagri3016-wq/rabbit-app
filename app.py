@@ -1,108 +1,187 @@
 import streamlit as st
+import tensorflow as tf
 import numpy as np
 from PIL import Image
-import tensorflow as tf
-import pickle
 import os
+import urllib.request
+import pickle
 import requests
+import io
 
-# --- CONFIGURATION ---
-MODEL_URL = "https://github.com/dgagri3016-wq/rabbit-weight-app/releases/download/keras_model/rabbit_weight_model.keras"
-MODEL_PATH = "rabbit_weight_model.keras"
-SCALER_PATH = "weight_scaler.pkl"
+# ==========================================
+# 1. SETUP & CONSTANTS
+# ==========================================
 
-st.set_page_config(page_title="Rabbit Weight Predictor", page_icon="🐇", layout="centered")
+BREED_MODEL_URL = "https://github.com/Rahman-Lone/rabbit-app/releases/download/v1.1/rabbit_breed_final_model.keras"
+WEIGHT_MODEL_URL = "https://github.com/Rahman-Lone/rabbit-app/releases/download/v1.1/rabbit_weight_model.keras"
 
-st.markdown("<h2 style='text-align: center;'>🐇 Rabbit Weight Predictor</h2>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: gray;'>AI-powered rabbit weight estimation using deep learning</p>", unsafe_allow_html=True)
+BREED_MODEL_PATH = "rabbit_breed_final_model.keras"
+WEIGHT_MODEL_PATH = "rabbit_weight_model.keras"
+LABELS_PATH = "tlabels.txt"
 
-# --- LOAD MODEL & SCALER ---
+BREED_IMG_SIZE = (299, 299)
+WEIGHT_IMG_SIZE = (192, 264)
+
+# Set up the Streamlit UI Page (Centered layout is best for mobile readability)
+st.set_page_config(page_title="Rabbit AI Predictor", page_icon="🐇", layout="centered")
+
+# Use a slightly smaller, more compact title for mobile
+st.markdown("<h2 style='text-align: center;'>🐇 Rabbit AI Predictor</h2>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray;'>Upload or take a photo to analyze your rabbit</p>", unsafe_allow_html=True)
+
+# ==========================================
+# 2. MODEL & FILE LOADERS
+# ==========================================
+
 @st.cache_resource
-def load_assets():
-    if not os.path.exists(MODEL_PATH):
-        with st.spinner("Downloading model from GitHub Releases (This happens once)..."):
-            response = requests.get(MODEL_URL)
-            if response.status_code == 200:
-                with open(MODEL_PATH, "wb") as f:
-                    f.write(response.content)
-            else:
-                st.error("Failed to download the model. Please check the MODEL_URL.")
-                st.stop()
-    
-    try:
-        model = tf.keras.models.load_model(MODEL_PATH)
-    except Exception as e:
-        st.error(f"Error loading model: {e}")
-        st.stop()
+def load_breed_model():
+    if os.path.exists(BREED_MODEL_PATH) and os.path.getsize(BREED_MODEL_PATH) < 1000000:
+        os.remove(BREED_MODEL_PATH)
+            
+    if not os.path.exists(BREED_MODEL_PATH):
+        print("Downloading Breed Model (once)...") 
+        urllib.request.urlretrieve(BREED_MODEL_URL, BREED_MODEL_PATH)
         
-    try:
-        with open(SCALER_PATH, "rb") as f:
-            scaler = pickle.load(f)
-    except Exception as e:
-        st.error(f"Error loading scaler: {e}")
-        st.stop()
+    return tf.keras.models.load_model(BREED_MODEL_PATH)
+
+@st.cache_resource
+def load_weight_model():
+    if os.path.exists(WEIGHT_MODEL_PATH) and os.path.getsize(WEIGHT_MODEL_PATH) < 1000000:
+        os.remove(WEIGHT_MODEL_PATH)
+            
+    if not os.path.exists(WEIGHT_MODEL_PATH):
+        print("Downloading Weight Model (once)...")
+        urllib.request.urlretrieve(WEIGHT_MODEL_URL, WEIGHT_MODEL_PATH)
         
-    return model, scaler
+    return tf.keras.models.load_model(WEIGHT_MODEL_PATH)
 
-model, scaler = load_assets()
+@st.cache_resource
+def load_scaler():
+    with open("weight_scaler.pkl", "rb") as f:
+        return pickle.load(f)
 
-# --- INITIALIZE VARIABLE FOR UI ---
-# This prevents the "NameError" by ensuring the variable exists before the button is clicked!
-final_weight = None
+@st.cache_data
+def load_labels():
+    if not os.path.exists(LABELS_PATH):
+        return None
+    with open(LABELS_PATH, "r") as f:
+        return [line.strip() for line in f.readlines()]
 
-# --- UI INTERFACE ---
-st.write("### 📷 Choose Input Method")
-input_mode = st.radio("Select Image Input Method:", ("Upload Image", "Take Picture"), label_visibility="collapsed")
-image_data = None
+# ==========================================
+# 3. IMAGE PREPROCESSING
+# ==========================================
 
-if input_mode == "Upload Image":
-    st.write("Upload a rabbit image (JPG, PNG)")
-    image_data = st.file_uploader("Choose a rabbit image...", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-elif input_mode == "Take Picture":
-    image_data = st.camera_input("Take a picture of the rabbit")
+def preprocess_image_for_breed(image):
+    image = image.convert("RGB")
+    image = image.resize(BREED_IMG_SIZE)
+    img_array = np.array(image)
+    return np.expand_dims(img_array, axis=0)
 
-if image_data is not None:
-    # Open the image
-    image = Image.open(image_data)
+def preprocess_image_for_weight(image):
+    image = image.convert("RGB")
+    image = image.resize(WEIGHT_IMG_SIZE) 
+    img_array = np.array(image, dtype="float32")
+    img_array = (img_array / 127.5) - 1.0 
+    return np.expand_dims(img_array, axis=0)
+
+# ==========================================
+# 4. MAIN APP LOGIC
+# ==========================================
+
+class_labels = load_labels()
+if not class_labels:
+    st.error(f"Missing {LABELS_PATH}.")
+    st.stop()
+
+# ---> NEW: Initialize Streamlit Memory <---
+# This tells Streamlit to "remember" our image between button clicks
+if "saved_image" not in st.session_state:
+    st.session_state.saved_image = None
+
+option = st.selectbox(
+    "📸 Choose image source:", 
+    ("Upload Image", "Camera Capture", "ESP32-CAM via Ngrok")
+)
+
+if option == "Upload Image":
+    uploaded_file = st.file_uploader("Select a photo", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
+    if uploaded_file is not None:
+        st.session_state.saved_image = Image.open(uploaded_file)
+
+elif option == "Camera Capture":
+    camera_file = st.camera_input("Take a picture")
+    if camera_file is not None:
+        st.session_state.saved_image = Image.open(camera_file)
+
+elif option == "ESP32-CAM via Ngrok":
+    st.info("Ensure your ESP32 is running and Ngrok is forwarding the tunnel.")
+    ngrok_url = st.text_input("🔗 Paste your Ngrok URL here:", placeholder="https://1234-abcd.ngrok-free.app")
     
-    if input_mode == "Upload Image":
-        st.image(image, caption="Image for Prediction", use_container_width=True)
-
-    if st.button("Predict Weight", type="primary"):
-        with st.spinner("Analyzing image..."):
+    if st.button("📸 Capture from ESP32"):
+        if ngrok_url:
+            capture_url = f"{ngrok_url.strip().rstrip('/')}/capture"
             try:
-                # --- PREPROCESSING (Corrected for your specific model) ---
-                img = image.convert('RGB')
-                img = img.resize((192, 264))
-                
-                # 1. Convert to float32
-                img_array = np.array(img, dtype="float32")
-                
-                # 2. Scale to [-1, 1] exactly like your other working app
-                img_array = (img_array / 127.5) - 1.0
-                
-                # 3. Add batch dimension -> (1, 264, 192, 3)
-                img_array = np.expand_dims(img_array, axis=0)
-
-                # --- PREDICTION ---
-                pred_scaled = model.predict(img_array)
-                pred_weight = scaler.inverse_transform(pred_scaled)
-                
-                # Update the final_weight variable!
-                final_weight = pred_weight[0][0]
-                
+                with st.spinner("Snapping photo from ESP32..."):
+                    headers = {"ngrok-skip-browser-warning": "true"}
+                    response = requests.get(capture_url, headers=headers, timeout=45)
+                    
+                if response.status_code == 200:
+                    # Save the new image into Streamlit's memory!
+                    st.session_state.saved_image = Image.open(io.BytesIO(response.content))
+                    st.success("Photo captured!")
+                else:
+                    st.error(f"Failed to capture! Status Code: {response.status_code}")
+                    st.write(response.text[:200])
             except Exception as e:
-                st.error(f"An error occurred during prediction: {e}")
+                st.error(f"Error connecting to camera: {e}")
+        else:
+            st.warning("Please paste your Ngrok URL first!")
 
-# --- CUSTOM HTML RESULTS DISPLAY ---
-st.divider()
-st.write("### Predicted Weight")
+# ==========================================
+# 5. PREDICTION & RESULTS DISPLAY
+# ==========================================
 
-if final_weight is not None:
-    # If the model has run successfully, show the real weight
-    st.markdown(f'<div class="result-value" style="font-size: 24px; font-weight: bold; color: #4CAF50;">{final_weight:.2f} kg</div>', unsafe_allow_html=True)
-else:
-    # If no prediction has been made yet, show the placeholder
-    st.markdown('<div class="result-value" style="font-size: 24px; font-weight: bold; color: gray;">-- kg</div>', unsafe_allow_html=True)
-    if image_data is None:
-        st.info("Upload an image or take a picture to begin prediction.")
+# Check the memory instead of the temporary variable
+if st.session_state.saved_image is not None:
+    
+    # FIXED: Replaced use_container_width with width='stretch' per your log warnings!
+    st.image(st.session_state.saved_image, width="stretch")
+    
+    if st.button("🔮 Predict Breed & Weight", type="primary"):
+        with st.spinner("Analyzing..."):
+            
+            # --- BREED PREDICTION ---
+            breed_model = load_breed_model()
+            # Pass the remembered image to your AI
+            breed_processed = preprocess_image_for_breed(st.session_state.saved_image)
+            breed_predictions = breed_model.predict(breed_processed)
+            
+            predicted_index = np.argmax(breed_predictions[0])
+            confidence = breed_predictions[0][predicted_index]
+            predicted_label = class_labels[predicted_index]
+            
+            st.divider() 
+            
+            col1, col2 = st.columns(2)
+            col1.metric("Primary Breed", predicted_label)
+            col2.metric("Confidence", f"{confidence * 100:.1f}%")
+            
+            # --- WEIGHT PREDICTION ---
+            try:
+                weight_model = load_weight_model()
+                scaler = load_scaler()
+                
+                weight_processed = preprocess_image_for_weight(st.session_state.saved_image)
+                scaled_weight_pred = weight_model.predict(weight_processed)
+                real_weight = scaler.inverse_transform(scaled_weight_pred)
+                
+                st.metric("⚖️ Estimated Weight", f"{real_weight[0][0]:.2f} kg")
+            except Exception as e:
+                st.error(f"Could not calculate weight: {e}")
+
+            # --- PROBABILITY BREAKDOWN ---
+            with st.expander("📊 View Top 3 Breed Probabilities"):
+                top_indices = np.argsort(breed_predictions[0])[-3:][::-1]
+                for i in top_indices:
+                    st.write(f"**{class_labels[i]}**")
+                    st.progress(float(breed_predictions[0][i]))
