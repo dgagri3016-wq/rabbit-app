@@ -23,10 +23,10 @@ BREED_IMG_SIZE = (299, 299)
 WEIGHT_IMG_SIZE = (192, 264)
 
 # Set up the Streamlit UI Page (Centered layout is best for mobile readability)
-st.set_page_config(page_title="Rabbit AI Predictor", page_icon="🐇", layout="centered")
+st.set_page_config(page_title="Rabbit Breed & Scale", page_icon="🐇", layout="centered")
 
 # Use a slightly smaller, more compact title for mobile
-st.markdown("<h2 style='text-align: center;'>🐇 Rabbit AI Predictor</h2>", unsafe_allow_html=True)
+st.markdown("<h2 style='text-align: center;'>🐇 Rabbit Breed & Scale</h2>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: gray;'>Upload or take a photo to analyze your rabbit</p>", unsafe_allow_html=True)
 
 # ==========================================
@@ -98,7 +98,7 @@ if not class_labels:
 if "saved_image" not in st.session_state:
     st.session_state.saved_image = None
 
-option = st.selectbox(
+option = st.radio(
     "📸 Choose image source:", 
     ("Upload Image", "Camera Capture", "ESP32-CAM via Ngrok")
 )
